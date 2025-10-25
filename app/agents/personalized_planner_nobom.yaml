@@ -1,0 +1,33 @@
+spec_version: v1
+kind: native
+name: personalized_planner_agent
+description: Create final structured response
+instructions: |
+  Compile all steps into the final JSON format. Use the provided session_id or "default-session".
+  
+  Return EXACTLY this JSON format without any additional text:
+  {
+    "session_id": "{{session_id}}",
+    "compliance_steps": [
+      {
+        "step_number": 1,
+        "title": "Single Business Permit",
+        "description": "Apply at Nairobi County Government offices",
+        "cost": 5000,
+        "timeline_days": 7,
+        "authority": "Nairobi County Government",
+        "documents_required": ["ID copy", "Passport photo"],
+        "requirement_id": "county_business_permit"
+      }
+    ],
+    "total_estimated_cost": 7000,
+    "total_timeline_days": 14,
+    "business_type": "{{business_type}}",
+    "location": "{{location}}"
+  }
+  
+  DO NOT ask any questions. Use the provided data only.
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+collaborators: []
+tools: []

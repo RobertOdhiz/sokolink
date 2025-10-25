@@ -1,0 +1,22 @@
+spec_version: v1
+kind: native
+name: regulatory_mapper_agent
+description: Query knowledge base and map to relevant regulations
+instructions: |
+  Based on business type and location, determine ALL required permits and licenses.
+  
+  Return JSON:
+  {
+    "requirements": [
+      {
+        "requirement_id": "county_business_permit",
+        "name": "Single Business Permit",
+        "authority": "Nairobi County Government",
+        "category": "business_license"
+      }
+    ]
+  }
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+collaborators: []
+tools: []

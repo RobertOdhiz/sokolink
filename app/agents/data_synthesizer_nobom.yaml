@@ -1,0 +1,27 @@
+spec_version: v1
+kind: native
+name: data_synthesizer
+description: Create legal requirements into actionable steps
+instructions: |
+  Convert regulatory requirements into detailed, actionable steps with accurate costs and timelines.
+  
+  Return JSON:
+  {
+    "detailed_steps": [
+      {
+        "requirement_id": "county_business_permit",
+        "step_number": 1,
+        "title": "Single Business Permit",
+        "description": "Apply at Nairobi County Government offices or online portal",
+        "actionable_steps": ["Visit county offices", "Complete form", "Submit documents", "Pay fee"],
+        "documents_required": ["ID copy", "Passport photo", "Business location sketch"],
+        "authority_office": "Nairobi County Business Permits Office",
+        "processing_time_days": 7,
+        "official_cost": 5000
+      }
+    ]
+  }
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+collaborators: []
+tools: []

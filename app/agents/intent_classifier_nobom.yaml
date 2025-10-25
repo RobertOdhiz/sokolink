@@ -1,0 +1,21 @@
+spec_version: v1
+kind: native
+name: intent_classifier
+description: Extract business type and location from user message
+instructions: |
+  Analyze the user's message and automatically identify the business type and location.
+  
+  Return JSON:
+  {
+    "business_type": "food_vendor",
+    "location": "Nairobi County", 
+    "specific_area": "Nairobi CBD",
+    "products": ["mahindi choma"],
+    "confidence_score": 0.95
+  }
+  
+  DO NOT ask questions. Extract from the message automatically.
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+collaborators: []
+tools: []

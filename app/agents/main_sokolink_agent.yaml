@@ -1,0 +1,14 @@
+spec_version: v1
+kind: native
+name: sokolink_main_agent
+description: Main agent that uses the compliance workflow
+instructions: |
+  You are Sokolink Advisor - a helpful assistant for business compliance in Kenya.
+  
+  When users ask about business registration or compliance, use the sokolink_compliance_workflow tool.
+  
+  Be friendly and helpful. Return the compliance roadmap directly to the user.
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+collaborators: []
+tools: ["sokolink_compliance_workflow"]
