@@ -2,15 +2,17 @@
 Watsonx Orchestrate Direct Service
 ----------------------------------
 - Uses IBM Cloud IAM (Bearer) authentication.
-- Sends user messages directly to Watson Orchestrate chat endpoint.
-- Returns only the real message content from Orchestrate.
+- Supports direct chat with Orchestrate agents using agent_id.
+- Handles both simple and structured conversational requests.
+- Includes retry logic, token caching, and structured logging.
 """
 
 import json
+import asyncio
 import httpx
 import structlog
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from app.config import get_settings
@@ -20,7 +22,7 @@ settings = get_settings()
 
 
 class WatsonxServiceDirect:
-    """Direct integration with IBM Watson Orchestrate."""
+    """Direct integration with IBM Watsonx Orchestrate."""
 
     def __init__(self):
         self.base_url = (
@@ -30,17 +32,18 @@ class WatsonxServiceDirect:
         self.api_key = settings.watsonx_api_key
         self.project_id = settings.watsonx_project_id
         self.instance_id = settings.watsonx_instance_id
+        self.agent_id = settings.watsonx_agent_id  # from config/.env
         self._iam_token: Optional[str] = None
         self._iam_token_expiry: Optional[datetime] = None
 
-        logger.info("Watsonx service initialized", base_url=self.base_url)
+        logger.info("Watsonx service initialized", base_url=self.base_url, agent_id=self.agent_id)
 
-    # ---------------- MAIN PUBLIC FUNCTION ---------------- #
+    # ---------------- MAIN PUBLIC FUNCTIONS ---------------- #
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=3, max=10),
            retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)))
     async def send_user_message(self, user_message: str, session_id: Optional[str] = None) -> Dict[str, Any]:
-        """Send a user message directly to WatsonX Orchestrate (creates a run/thread)."""
+        """Send a simple user message to Watsonx Orchestrate."""
         orchestrate_url = f"{self.base_url}/v1/orchestrate/runs?stream=false&multiple_content=false"
 
         payload = {
@@ -66,17 +69,72 @@ class WatsonxServiceDirect:
             return data
         else:
             logger.error(
-                "Watson Orchestrate returned an error",
+                "Watsonx Orchestrate returned an error",
                 status=response.status_code,
                 details=response.text,
             )
             raise Exception(f"Watsonx Orchestrate error: {response.text}")
 
+    async def chat_with_agent(
+        self,
+        user_message: str,
+        role: str = "user",
+        additional_context: Optional[Dict[str, Any]] = None,
+        stream: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Send a structured chat request directly to a specific agent via the Orchestrate API.
+        """
+        token = await self._get_iam_token()
+        url = f"https://{settings.watsonx_api_endpoint}/api/v1/orchestrate/{self.agent_id}/chat/completions"
 
-    async def get_thread_messages(self, thread_id: str) -> Dict[str, Any]:
-        """
-        Retrieve all messages from a Watson Orchestrate thread.
-        """
+        # You can customize payload depending on your use case
+        payload = {
+            "messages": [
+                {
+                    "role": role,
+                    "content": [
+                        {
+                            "response_type": "conversational_search",
+                            "json_schema": {},
+                            "ui_schema": {},
+                            "form_data": {},
+                            "id": "message_1",
+                            "form_operation": "submit",
+                            "sub_type": "text_input",
+                            "event_type": "message",
+                            "dps_payload_id": "payload_1"
+                        },
+                        {
+                            "response_type": "text",
+                            "text": user_message
+                        }
+                    ]
+                }
+            ],
+            "additional_parameters": additional_context or {},
+            "context": {},
+            "stream": stream
+        }
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+
+        if resp.status_code != 200:
+            logger.error("❌ chat_with_agent error", status=resp.status_code, text=resp.text)
+            raise Exception(f"chat_with_agent failed: {resp.text}")
+
+        data = resp.json()
+        logger.info("💬 chat_with_agent successful", data=data)
+        return data
+
+    async def get_thread_messages(self, thread_id: str) -> List[Dict[str, Any]]:
+        """Retrieve all messages from a Watsonx Orchestrate thread."""
         token = await self._get_iam_token()
         url = f"{self.base_url}/v1/orchestrate/threads/{thread_id}/messages"
 
@@ -90,42 +148,64 @@ class WatsonxServiceDirect:
 
         if resp.status_code != 200:
             raise RuntimeError(
-                f"Watson Orchestrate message retrieval failed ({resp.status_code}): {resp.text}"
+                f"Watsonx Orchestrate message retrieval failed ({resp.status_code}): {resp.text}"
             )
 
         return resp.json()
 
+    async def wait_for_assistant_reply(self, thread_id: str, max_attempts: int = 10, delay: int = 3) -> Optional[str]:
+        """Poll Orchestrate for an assistant's response."""
+        thinking_messages = [
+            "💭 Thinking...",
+            "🤔 Let me check that for you...",
+            "🧠 Processing your request...",
+            "🔍 Gathering insights...",
+            "⌛ Almost there..."
+        ]
 
+        for attempt in range(max_attempts):
+            logger.info(thinking_messages[attempt % len(thinking_messages)])
+            messages = await self.get_thread_messages(thread_id)
+
+            for msg in messages:
+                if msg.get("role") == "assistant":
+                    for block in msg.get("content", []):
+                        if block.get("response_type") == "text":
+                            return block.get("text")
+
+            await asyncio.sleep(delay)
+
+        return None
+
+    async def chat(self, user_message: str) -> Dict[str, Any]:
+        """
+        Full chat sequence:
+        - Send a message
+        - Poll Orchestrate for the assistant's response
+        - Return user-facing message
+        """
+        run_data = await self.send_user_message(user_message)
+        thread_id = run_data.get("thread_id")
+
+        if not thread_id:
+            raise ValueError("No thread_id returned from Orchestrate.")
+
+        assistant_reply = await self.wait_for_assistant_reply(thread_id)
+
+        if assistant_reply:
+            return {
+                "success": True,
+                "thread_id": thread_id,
+                "reply": assistant_reply
+            }
+        else:
+            return {
+                "success": False,
+                "thread_id": thread_id,
+                "reply": "⚠️ No response received yet. Please try again in a moment."
+            }
 
     # ---------------- INTERNAL HELPERS ---------------- #
-
-    def _extract_user_message(self, data: Dict[str, Any]) -> str:
-        """
-        Extracts the message text returned by Orchestrate.
-        """
-        try:
-            # Depending on Orchestrate run output structure
-            messages = data.get("messages") or data.get("choices") or []
-            if not messages:
-                return "No response message found."
-
-            # If messages are structured as in Orchestrate Run API
-            for msg in messages:
-                if msg.get("role") == "assistant" and "content" in msg:
-                    content = msg["content"]
-                    if isinstance(content, str):
-                        return content
-                    if isinstance(content, list):
-                        return " ".join(
-                            [blk.get("text", "") for blk in content if blk.get("text")]
-                        ).strip()
-
-            # Fallback if assistant not found explicitly
-            return json.dumps(messages, indent=2)
-
-        except Exception as e:
-            logger.error("Failed to parse Orchestrate response", error=str(e))
-            return "Could not extract message from Orchestrate response."
 
     async def _get_auth_headers(self) -> Dict[str, str]:
         """Retrieve or refresh IAM token."""

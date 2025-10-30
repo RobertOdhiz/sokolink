@@ -1,5 +1,7 @@
 import asyncio
 import os
+import sys
+import itertools
 from typing import Any, Dict
 
 try:
@@ -12,6 +14,17 @@ def mask_token(token: str, show: int = 6) -> str:
     if not token or len(token) <= show * 2:
         return "***"
     return f"{token[:show]}...{token[-show:]}"
+
+
+async def spinner(message: str, event: asyncio.Event):
+    """Simple async spinner animation."""
+    for frame in itertools.cycle(["⏳", "🤔", "💭", "🔄"]):
+        if event.is_set():
+            break
+        sys.stdout.write(f"\r{frame} {message}")
+        sys.stdout.flush()
+        await asyncio.sleep(0.3)
+    sys.stdout.write("\r✅ Done!\n")
 
 
 async def run_tests() -> None:
@@ -30,36 +43,44 @@ async def run_tests() -> None:
 
     # 1️⃣ IAM Token
     print("\n[1] Fetching IAM token...")
+    token_event = asyncio.Event()
+    spinner_task = asyncio.create_task(spinner("Getting access token from IBM Cloud...", token_event))
     try:
         token = await watsonx_service._get_iam_token()
+        token_event.set()
+        await spinner_task
         print("✅ IAM Token:", mask_token(token))
     except Exception as e:
-        print("❌ IAM token retrieval failed:", e)
+        token_event.set()
+        print(f"\n❌ IAM token retrieval failed: {e}")
         return
 
-    # 2️⃣ Send Message
-    print("\n[2] Sending message to Watson Orchestrate...")
+    # 2️⃣ Chat With Agent
+    print("\n[2] Initiating chat with Watsonx Orchestrate Agent...")
+    chat_event = asyncio.Event()
+    spinner_task = asyncio.create_task(spinner("Chatting with Watsonx agent...", chat_event))
     try:
-        response: Dict[str, Any] = await watsonx_service.send_user_message("I am Amina, I own a small business in Kibera that sells sweets in Nairobi?")
-        print("\n✅ Orchestrate Response:")
+        # Example message
+        user_message = "I am Amina, I own a small business in Kibera that sells sweets in Nairobi."
+        response: Dict[str, Any] = await watsonx_service.chat_with_agent(user_message)
+
+        chat_event.set()
+        await spinner_task
+
+        print("\n✅ Agent Chat Response:")
         print(response)
-    except Exception as e:
-        print("❌ Message test failed:", e)
-        return
 
-    thread_id = response.get("thread_id")
-    if not thread_id:
-        print("⚠️ No thread_id returned, cannot fetch messages.")
-        return
-
-    # 3️⃣ Fetch Messages
-    print("\n[3] Fetching messages from Orchestrate thread...")
-    try:
-        messages: Dict[str, Any] = await watsonx_service.get_thread_messages(thread_id)
-        print("\n✅ Thread Messages:")
-        print(messages)
+        # Optional: extract structured output
+        if isinstance(response, dict):
+            print("\n🧠 Agent message summary:")
+            if "reply" in response:
+                print(response["reply"])
+            elif "messages" in response:
+                for msg in response["messages"]:
+                    print(f"- {msg.get('content', '')}")
     except Exception as e:
-        print("❌ Failed to fetch messages:", e)
+        chat_event.set()
+        print(f"\n❌ Chat with agent failed: {e}")
         return
 
     print("\n🎯 All tests completed successfully!\n")

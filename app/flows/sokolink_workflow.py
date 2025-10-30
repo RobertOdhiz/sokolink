@@ -2,18 +2,20 @@
 Build a Sokolink compliance workflow that connects four agents to provide business compliance guidance.
 '''
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import uuid
 from ibm_watsonx_orchestrate.flow_builder.flows import END, Flow, flow, START
 from typing import List, Dict, Any, Optional
 
 # Input schema for the workflow
 class WorkflowInput(BaseModel):
     user_message: str
-    session_id: str
+    session_id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
+
 
 # Output schema for the workflow
 class WorkflowOutput(BaseModel):
-    session_id: str
+    session_id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     compliance_steps: List[Dict[str, Any]]
     total_estimated_cost: float
     total_timeline_days: int

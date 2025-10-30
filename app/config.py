@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     # Optional convenience fields (used to construct base URL if needed)
     watsonx_region: Optional[str] = "us-south"
     watsonx_instance_id: Optional[str] = "ac6066db-ed5a-4a7f-b6a3-f6c3783fff90"
+    watsonx_agent_id: Optional[str] = "8c222da7-4c8f-4aca-a88f-1adcd571de37"
+    watsonx_api_endpoint: Optional[str] = "https://us-south.watson-orchestrate.cloud.ibm.com"
     # Optional: allow providing a ready IAM token
     watsonx_iam_token: Optional[str] = None
     
