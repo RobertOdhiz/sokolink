@@ -11,7 +11,7 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, status
 import structlog
 
-from config import get_settings
+from app.config import get_settings
 
 logger = structlog.get_logger()
 settings = get_settings()

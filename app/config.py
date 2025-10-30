@@ -32,9 +32,14 @@ class Settings(BaseSettings):
     
     # IBM Watsonx Orchestrate Configuration
     watsonx_api_key: str
-    watsonx_base_url: str = "https://api.watsonx.orchestrate.ibm.com"
+    watsonx_base_url: str = "https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/"
     watsonx_workflow_id: str = "sokolink_compliance_advisor"
-    watsonx_project_id: str
+    watsonx_project_id: str = ""
+    # Optional convenience fields (used to construct base URL if needed)
+    watsonx_region: Optional[str] = "us-south"
+    watsonx_instance_id: Optional[str] = "ac6066db-ed5a-4a7f-b6a3-f6c3783fff90"
+    # Optional: allow providing a ready IAM token
+    watsonx_iam_token: Optional[str] = None
     
     # Security Configuration
     secret_key: str

@@ -14,7 +14,7 @@ from services.whatsapp_service import whatsapp_service
 from services.watsonx_service import watsonx_service
 from services.database_service import db_service
 from utils.security import verify_token, validate_environment
-from config import get_settings
+from app.config import get_settings
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1", tags=["api"])
