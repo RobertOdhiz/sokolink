@@ -15,7 +15,7 @@
 
 ## 🚀 Overview
 
-Sokolink Advisor is an AI-powered compliance assistant that helps Kenya's 5.1 million informal businesses navigate complex regulatory requirements through WhatsApp. Built with **IBM Watsonx Orchestrate**, our solution transforms weeks of confusion into 30 seconds of clarity.
+Sokolink Advisor is an AI-powered compliance assistant that helps Kenya's 5.85 million informal businesses navigate complex regulatory requirements through WhatsApp. Built with **IBM Watsonx Orchestrate**, our solution transforms weeks of confusion into 30 seconds of clarity.
 
 ### 📊 The Problem
 - **5.85 million** Kenyan businesses operate informally (KNBS 2019)
